@@ -29,6 +29,11 @@ class FileNumberReader : public INumberReader {
 public:
     std::vector<int> read_numbers(const std::string& filename) override {
         std::ifstream in(filename);
+        if (!in.is_open()) {
+            std::cout << " Error: File not found: " << filename << "\n";
+            return {};  
+        }
+
         std::vector<int> numbers;
         int n;
         while (in >> n) {
@@ -37,6 +42,7 @@ public:
         return numbers;
     }
 };
+
 
 class EvenFilter : public INumberFilter {
 public:
