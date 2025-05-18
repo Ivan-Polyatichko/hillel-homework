@@ -43,7 +43,6 @@ public:
     }
 };
 
-
 class EvenFilter : public INumberFilter {
 public:
     bool keep(int number) override {
