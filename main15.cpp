@@ -1,13 +1,11 @@
 #include <iostream>
 #include <fstream>
-#include <sstream>
 #include <vector>
 #include <string>
 #include <memory>
 #include <map>
 #include <functional>
 #include <cstdint>
-
 
 struct INumberReader {
     virtual ~INumberReader() = default;
@@ -30,8 +28,8 @@ public:
     std::vector<int> read_numbers(const std::string& filename) override {
         std::ifstream in(filename);
         if (!in.is_open()) {
-            std::cout << " Error: File not found: " << filename << "\n";
-            return {};  
+            std::cout << "Error: File not found: " << filename << "\n";
+            return {};
         }
 
         std::vector<int> numbers;
@@ -67,7 +65,7 @@ public:
 };
 
 class FilterFactory {
-    using Creator = std::function<std::unique_ptr<INumberFilter>()>;
+    using Creator = std::function<std::unique_ptr<INumberFilter>(const std::string&)>;
     std::map<std::string, Creator> registry;
 
 public:
@@ -76,21 +74,18 @@ public:
         return factory;
     }
 
-    void register_filter(const std::string& name, Creator creator) {
-        registry[name] = creator;
+    void register_filter(const std::string& prefix, Creator creator) {
+        registry[prefix] = creator;
     }
 
     std::unique_ptr<INumberFilter> create(const std::string& name) {
-        if (name.starts_with("GT")) {
-            int n = std::stoi(name.substr(2));
-            return std::make_unique<GTFilter>(n);
+        for (const auto& [prefix, creator] : registry) {
+            if (name.starts_with(prefix)) {
+                return creator(name.substr(prefix.size()));
+            }
         }
 
-        auto it = registry.find(name);
-        if (it != registry.end()) {
-            return it->second();
-        }
-
+        std::cout << "Error: Unknown filter: " << name << "\n";
         return nullptr;
     }
 
@@ -156,18 +151,28 @@ int main(int argc, char** argv) {
     std::string filter_name = argv[1];
     std::string file_name = argv[2];
 
-    FilterFactory::instance().register_filter("EVEN", []() {
+    FilterFactory::instance().register_filter("EVEN", [](const std::string&) {
         return std::make_unique<EvenFilter>();
         });
-    FilterFactory::instance().register_filter("ODD", []() {
+
+    FilterFactory::instance().register_filter("ODD", [](const std::string&) {
         return std::make_unique<OddFilter>();
         });
-    
+
+    FilterFactory::instance().register_filter("GT", [](const std::string& param) -> std::unique_ptr<INumberFilter> {
+        try {
+            if (param.empty()) throw std::invalid_argument("Missing value");
+            int n = std::stoi(param);
+            return std::make_unique<GTFilter>(n);
+        }
+        catch (...) {
+            std::cout << "Error: GT filter requires a numeric value, e.g., GT5\n";
+            return nullptr;
+        }
+        });
+
     auto filter = FilterFactory::instance().create(filter_name);
-    if (!filter) {
-        std::cout << "Unknown filter: " << filter_name << "\n";
-        return 1;
-    }
+    if (!filter) return 1;
 
     FileNumberReader reader;
     PrintObserver printer;
